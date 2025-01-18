@@ -1,18 +1,50 @@
 import streamlit as st
-import seaborn as sns
-import numpy as np
+import pandas as pd
+from ast import literal_eval
+from streamlit_authenticator import Authenticate
+from streamlit_option_menu import option_menu
 
-taxis = sns.load_dataset("taxis")
-images = {"Brooklyn": "https://voyageforum.info/images/hd/posts/openmedium/1570541343-3kyuiYKirJKB97b.jpeg", 
-          "Queens": "https://th.bing.com/th/id/R.abea870b3c0a1bbc5f08c57e9c69c664?rik=54HguWX%2f5IEiUA&pid=ImgRaw&r=0",
-          "Bronx": "https://plus.unsplash.com/premium_photo-1682116752742-7bb2b3698486?q=80&w=2065&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", 
-          "Manhattan": "https://plus.unsplash.com/premium_photo-1680284197408-0f83f185818b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-          np.nan: "https://th.bing.com/th/id/OIP.x7DV_yk6r4eEpB1EZ33_xwHaHa?rs=1&pid=ImgDetMain"}
 
-st.title("Bienvenue sur le site web HEY HO, TAXIS ! 🚕")
+users_data = pd.read_csv("user_data.csv", 
+                         index_col="usernames", 
+                         dtype={"password": str}, 
+                         converters={'pet_pixs': literal_eval})
 
-pickup_borough = st.selectbox("Indiquez votre arrondissement de récupération", 
-                              options=taxis['pickup_borough'].unique())
+credentials = {"usernames": users_data.to_dict(orient="index")}
 
-st.write("Tu as choisis: ", pickup_borough)
-st.image(images[pickup_borough])
+authenticator = Authenticate(
+    credentials, # Les données des comptes
+    "cookie_name", # Le nom du cookie, un str quelconque
+    "cookie_key", # La clé du cookie, un str quelconque
+    30, # Le nombre de jours avant que le cookie expire 
+)
+
+authenticator.login()
+
+def accueil():
+    with st.sidebar:
+        st.write("Bienvenue", st.session_state["name"])
+        user_data = credentials['usernames'][st.session_state["username"]]
+            
+        selection = option_menu(menu_title = None, 
+                                options=["🤩 Accueil", "📸 Les photos de mon "+ user_data["pet_name"]], 
+                                default_index=0)
+      
+    if selection == "🤩 Accueil":
+        st.title("Bienvenue sur ma page")
+        st.image(user_data['profile_pic'])
+    elif selection == "📸 Les photos de mon " + user_data["pet_name"]:
+        st.title("Bienvenue dans l'album de mon " + user_data["pet_name"] + user_data["pet_icone"])
+    
+        for index, col in enumerate(st.columns(3)):
+            col.image(user_data["pet_pixs"][index])
+
+
+if st.session_state["authentication_status"]:
+        accueil()
+        authenticator.logout("Déconnexion", location="sidebar")
+    
+elif st.session_state["authentication_status"] is False:
+    st.error("L'username ou le password est/sont incorrect")
+elif st.session_state["authentication_status"] is None:
+    st.warning('Les champs username et mot de passe doivent être remplie')
